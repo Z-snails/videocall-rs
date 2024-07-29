@@ -11,6 +11,7 @@ use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
+use web_sys::EncodedVideoChunk;
 use web_sys::HtmlVideoElement;
 use web_sys::LatencyMode;
 use web_sys::MediaStream;
@@ -33,6 +34,7 @@ use super::transform::transform_video_chunk;
 use crate::constants::VIDEO_CODEC;
 use crate::constants::VIDEO_HEIGHT;
 use crate::constants::VIDEO_WIDTH;
+use crate::recorder::IdbRecorder;
 
 /// [CameraEncoder] encodes the video from a camera and sends it through a [`VideoCallClient`](crate::VideoCallClient) connection.
 ///
@@ -47,6 +49,7 @@ pub struct CameraEncoder {
     client: VideoCallClient,
     video_elem_id: String,
     state: EncoderState,
+    recorder: Option<IdbRecorder>,
 }
 
 impl CameraEncoder {
@@ -58,11 +61,16 @@ impl CameraEncoder {
     ///
     /// The encoder is created in a disabled state, [`encoder.set_enabled(true)`](Self::set_enabled) must be called before it can start encoding.
     /// The encoder is created without a camera selected, [`encoder.select(device_id)`](Self::select) must be called before it can start encoding.
-    pub fn new(client: VideoCallClient, video_elem_id: &str) -> Self {
+    pub fn new(
+        client: VideoCallClient,
+        video_elem_id: &str,
+        recorder: Option<IdbRecorder>,
+    ) -> Self {
         Self {
             client,
             video_elem_id: video_elem_id.to_string(),
             state: EncoderState::new(),
+            recorder,
         }
     }
 
@@ -115,8 +123,10 @@ impl CameraEncoder {
         let video_output_handler = {
             let mut buffer: [u8; 100000] = [0; 100000];
             let mut sequence_number = 0;
+            let recorder = self.recorder.clone();
             Box::new(move |chunk: JsValue| {
-                let chunk = web_sys::EncodedVideoChunk::from(chunk);
+                let chunk = EncodedVideoChunk::from(chunk);
+                recorder.as_ref().map(|r| r.record_video(&chunk));
                 let packet: PacketWrapper = transform_video_chunk(
                     chunk,
                     sequence_number,

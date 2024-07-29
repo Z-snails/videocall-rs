@@ -1,6 +1,8 @@
 use gloo_timers::callback::Timeout;
 use log::debug;
-use videocall_client::{CameraEncoder, MicrophoneEncoder, ScreenEncoder, VideoCallClient};
+use videocall_client::{
+    recorder::IdbRecorder, CameraEncoder, MicrophoneEncoder, ScreenEncoder, VideoCallClient,
+};
 
 use std::fmt::Debug;
 use yew::prelude::*;
@@ -37,6 +39,8 @@ pub struct MeetingProps {
 
     pub client: VideoCallClient,
 
+    pub recorder: Option<IdbRecorder>,
+
     pub share_screen: bool,
 
     pub mic_enabled: bool,
@@ -50,8 +54,9 @@ impl Component for Host {
 
     fn create(ctx: &Context<Self>) -> Self {
         let client = &ctx.props().client;
+        let recorder = &ctx.props().recorder;
         Self {
-            camera: CameraEncoder::new(client.clone(), VIDEO_ELEMENT_ID),
+            camera: CameraEncoder::new(client.clone(), VIDEO_ELEMENT_ID, recorder.clone()),
             microphone: MicrophoneEncoder::new(client.clone()),
             screen: ScreenEncoder::new(client.clone()),
             share_screen: ctx.props().share_screen,

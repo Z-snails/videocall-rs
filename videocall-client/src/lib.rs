@@ -75,6 +75,7 @@ mod crypto;
 mod decode;
 mod encode;
 mod media_devices;
+pub mod recorder;
 mod wrappers;
 
 pub use client::{VideoCallClient, VideoCallClientOptions};

@@ -1,9 +1,14 @@
+use std::cell::OnceCell;
+
 use crate::components::{canvas_generator, peer_list::PeerList};
 use crate::constants::{CANVAS_LIMIT, USERS_ALLOWED_TO_STREAM, WEBTRANSPORT_HOST};
 use crate::{components::host::Host, constants::ACTIX_WEBSOCKET};
 use log::{error, warn};
 use types::protos::media_packet::media_packet::MediaType;
-use videocall_client::{MediaDeviceAccess, VideoCallClient, VideoCallClientOptions};
+use videocall_client::{
+    recorder::{self, IdbRecorder},
+    MediaDeviceAccess, VideoCallClient, VideoCallClientOptions,
+};
 use wasm_bindgen::JsValue;
 use web_sys::*;
 use yew::prelude::*;
@@ -38,6 +43,7 @@ pub enum Msg {
     OnPeerAdded(String),
     OnFirstFrame((String, MediaType)),
     UserScreenAction(UserScreenAction),
+    IdbRecorderInit(recorder::Result<IdbRecorder>),
 }
 
 impl From<WsAction> for Msg {
@@ -58,6 +64,12 @@ impl From<MeetingAction> for Msg {
     }
 }
 
+impl From<recorder::Result<IdbRecorder>> for Msg {
+    fn from(value: recorder::Result<IdbRecorder>) -> Self {
+        Msg::IdbRecorderInit(value)
+    }
+}
+
 #[derive(Properties, Debug, PartialEq)]
 pub struct AttendantsComponentProps {
     #[prop_or_default]
@@ -73,6 +85,7 @@ pub struct AttendantsComponentProps {
 
 pub struct AttendantsComponent {
     pub client: VideoCallClient,
+    pub recorder: OnceCell<IdbRecorder>,
     pub media_device_access: MediaDeviceAccess,
     pub share_screen: bool,
     pub mic_enabled: bool,
@@ -136,8 +149,11 @@ impl Component for AttendantsComponent {
     type Properties = AttendantsComponentProps;
 
     fn create(ctx: &Context<Self>) -> Self {
+        let recorder = OnceCell::new();
+
         Self {
             client: Self::create_video_call_client(ctx),
+            recorder,
             media_device_access: Self::create_media_device_access(ctx),
             share_screen: false,
             mic_enabled: false,
@@ -150,6 +166,7 @@ impl Component for AttendantsComponent {
     fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
         if first_render {
             ctx.link().send_message(WsAction::RequestMediaPermissions);
+            ctx.link().send_future(IdbRecorder::new("recordings"));
         }
     }
 
@@ -215,6 +232,16 @@ impl Component for AttendantsComponent {
                 }
                 true
             }
+            Msg::IdbRecorderInit(result) => match result {
+                Ok(recorder) => {
+                    self.recorder.set(recorder);
+                    true
+                }
+                Err(err) => {
+                    gloo::console::error!(format!("Unable to create IdbRecorder: {err}"));
+                    false
+                }
+            },
         }
     }
 
@@ -263,7 +290,13 @@ impl Component for AttendantsComponent {
                                     </div>
                                     {
                                         if media_access_granted {
-                                            html! {<Host client={self.client.clone()} share_screen={self.share_screen} mic_enabled={self.mic_enabled} video_enabled={self.video_enabled} />}
+                                            html! {<Host
+                                                client={self.client.clone()}
+                                                share_screen={self.share_screen}
+                                                mic_enabled={self.mic_enabled}
+                                                video_enabled={self.video_enabled}
+                                                recorder={self.recorder.get().cloned()}
+                                            />}
                                         } else {
                                             html! {<></>}
                                         }

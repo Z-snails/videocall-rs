@@ -13,9 +13,8 @@ use yew::prelude::*;
 extern crate lazy_static;
 use components::{attendants::AttendantsComponent, top_bar::TopBar};
 use gloo_utils::window;
-use yew_router::prelude::*;
-
 use pages::home::Home;
+use yew_router::prelude::*;
 
 use crate::constants::ENABLE_OAUTH;
 
@@ -44,7 +43,7 @@ fn switch(routes: Route) -> Html {
         Route::Login => html! { <Login/> },
         Route::Meeting { email, id } => html! {
             <>
-                <TopBar/>
+                // <TopBar/>
                 <AttendantsComponent email={email} id={id} webtransport_enabled={*WEBTRANSPORT_ENABLED} e2ee_enabled={*E2EE_ENABLED} />
             </>
         },
@@ -54,7 +53,7 @@ fn switch(routes: Route) -> Html {
             webtransport_enabled,
         } => html! {
             <>
-                <TopBar/>
+                // <TopBar/>
                 <AttendantsComponent email={email} id={id} webtransport_enabled={truthy(Some(&webtransport_enabled))} e2ee_enabled={*E2EE_ENABLED} />
             </>
         },
